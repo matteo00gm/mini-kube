@@ -9,7 +9,9 @@ import src.main.java.org.minikube.model.Node;
 public class Balanced implements SchedulerStrategy {
 
     private final PriorityQueue<Node> maxHeap = new PriorityQueue<>(
-        Comparator.comparingInt(Node::getAvailableMemoryMB).reversed().thenComparing(Node::getTotalMemoryMB)
+        Comparator.comparingInt(Node::getAvailableMemoryMB).reversed()
+            .thenComparing(Node::getTotalMemoryMB)
+            .thenComparing(Node::getName)
     );
 
     @Override
