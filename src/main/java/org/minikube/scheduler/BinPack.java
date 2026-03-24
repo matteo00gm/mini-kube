@@ -9,7 +9,7 @@ import src.main.java.org.minikube.model.Node;
 public class BinPack implements SchedulerStrategy {
 
     private final TreeSet<Node> bst = new TreeSet<>(
-        Comparator.comparingInt(Node::getAvailableMemoryMB).reversed()
+        Comparator.comparingInt(Node::getAvailableMemoryMB)
             .thenComparing(Node::getTotalMemoryMB)
             .thenComparing(Node::getName)
     );
