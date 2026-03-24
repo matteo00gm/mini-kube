@@ -21,7 +21,7 @@ public class BinPack implements SchedulerStrategy {
 
     @Override
     public Node schedule(DesiredTask task) {
-        Node key = new Node("keyNode", task.requiredMemoryMB());
+        Node key = new Node("dummyNode", task.requiredMemoryMB());
 
         Node binPacked = bst.ceiling(key);
 
@@ -31,7 +31,7 @@ public class BinPack implements SchedulerStrategy {
             bst.add(binPacked);
             return binPacked;
         }
-        
+
         return null;
     }
     
