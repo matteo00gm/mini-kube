@@ -1,6 +1,8 @@
-package src.main.java.org.minikube.model;
+package org.minikube.model;
 
-public class Node {
+import java.io.Serializable;
+
+public class Node implements Serializable {
 
     private final String name;
     private final int totalMemoryMB;

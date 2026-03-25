@@ -1,12 +1,12 @@
-package src.main.java.org.minikube.engine;
+package org.minikube.engine;
 
 import java.io.IOException;
 import java.util.UUID;
 
-import src.main.java.org.minikube.model.DesiredTask;
-import src.main.java.org.minikube.model.Node;
-import src.main.java.org.minikube.model.RunningPod;
-import src.main.java.org.minikube.model.RunningPod.PodStatus;
+import org.minikube.model.DesiredTask;
+import org.minikube.model.Node;
+import org.minikube.model.RunningPod;
+import org.minikube.model.RunningPod.PodStatus;
 
 public class Kubelet {
     public RunningPod startPod(DesiredTask task, Node assignedNode) {

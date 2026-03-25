@@ -1,11 +1,10 @@
-package src.test.java.org.minikube.scheduler;
+package org.minikube.scheduler;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-import src.main.java.org.minikube.model.DesiredTask;
-import src.main.java.org.minikube.model.Node;
-import src.main.java.org.minikube.scheduler.Balanced;
+import org.minikube.model.DesiredTask;
+import org.minikube.model.Node;
 
 public class BalancedTest {
 

@@ -1,1 +1,4 @@
-lib/
+.gradle
+.vscode
+build
+lib

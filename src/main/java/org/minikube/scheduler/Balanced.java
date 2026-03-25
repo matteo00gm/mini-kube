@@ -1,10 +1,10 @@
-package src.main.java.org.minikube.scheduler;
+package org.minikube.scheduler;
 
 import java.util.Comparator;
 import java.util.PriorityQueue;
 
-import src.main.java.org.minikube.model.DesiredTask;
-import src.main.java.org.minikube.model.Node;
+import org.minikube.model.DesiredTask;
+import org.minikube.model.Node;
 
 public class Balanced implements SchedulerStrategy {
 

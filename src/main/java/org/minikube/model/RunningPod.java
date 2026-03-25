@@ -1,6 +1,8 @@
-package src.main.java.org.minikube.model;
+package org.minikube.model;
 
-public class RunningPod {
+import java.io.Serializable;
+
+public class RunningPod implements Serializable {
     
     public enum PodStatus {
         STARTING, RUNNING, DEAD

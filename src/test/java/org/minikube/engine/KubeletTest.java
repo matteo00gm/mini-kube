@@ -1,11 +1,10 @@
-package src.test.java.org.minikube.engine;
+package org.minikube.engine;
 
 import org.junit.jupiter.api.Test;
 
-import src.main.java.org.minikube.engine.Kubelet;
-import src.main.java.org.minikube.model.DesiredTask;
-import src.main.java.org.minikube.model.Node;
-import src.main.java.org.minikube.model.RunningPod;
+import org.minikube.model.DesiredTask;
+import org.minikube.model.Node;
+import org.minikube.model.RunningPod;
 
 import static org.junit.jupiter.api.Assertions.*;
 
