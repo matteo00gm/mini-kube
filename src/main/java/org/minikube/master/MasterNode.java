@@ -1,87 +1,41 @@
 package org.minikube.master;
 
-import io.javalin.Javalin;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.minikube.model.DesiredTask;
-import org.minikube.model.Node;
-import org.minikube.scheduler.SchedulerStrategy;
 import org.minikube.scheduler.BinPack;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.List;
 
 public class MasterNode {
 
-    private static final Logger log = LoggerFactory.getLogger(MasterNode.class);
+    private final ApiServer server;
+    private final RaftManager raft;
 
-    private final SchedulerStrategy scheduler;
-    private final ConcurrentHashMap<String, Node> activeNodes = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Queue<DesiredTask>> assignedTasks = new ConcurrentHashMap<>();
-    private final ObjectMapper jsonMapper = new ObjectMapper();
-    private Javalin app;
+    public MasterNode(int port, String nodeUrl, List<String> peerUrls) {
 
-    public MasterNode(SchedulerStrategy scheduler) {
-        this.scheduler = scheduler;
+        // ClusteState is the Memory -> it contains the scheduler, the tasks and the active nodes
+        ClusterState state = new ClusterState(new BinPack());
+
+        // RaftManger is the Brain of the system, using the Raft consensus algorithm, makes the masters nodes talk to each other
+        this.raft = new RaftManager(nodeUrl, peerUrls, state);
+        
+        this.server = new ApiServer(port, state, raft);
     }
 
-    public void start(int port) {
-
-        app = Javalin.create().start(port);
-        log.info("Server listening on port {}", port);
-
-        app.post("/register", ctx -> {
-            Node workerNode = jsonMapper.readValue(ctx.body(), Node.class);
-            String workerName = workerNode.getName();
-
-            if (activeNodes.containsKey(workerName)) {
-                log.info("Node {} already exists.", workerName);
-                ctx.status(204).result("Node already exists.");
-                return;
-            }
-
-            activeNodes.put(workerName, workerNode);
-            scheduler.addNode(workerNode);
-            assignedTasks.put(workerName, new ConcurrentLinkedQueue<>());
-
-            log.info("Node Joined: {} ({}MB RAM)", workerName, workerNode.getAvailableMemoryMB());
-            ctx.status(200).result("Node registered.");
-        });
-
-        app.post("/submit-task", ctx -> {
-            DesiredTask task = jsonMapper.readValue(ctx.body(), DesiredTask.class);
-            log.info("Received new task request: {}", task.id());
-
-            Node chosenNode = scheduler.schedule(task);
-
-            if (chosenNode != null) {
-                assignedTasks.get(chosenNode.getName()).offer(task);
-                log.info("Scheduled task '{}' onto -> {}", task.id(), chosenNode.getName());
-                ctx.status(202).result("Task Scheduled on " + chosenNode.getName());
-            } else {
-                log.warn("Failed to schedule task '{}': Insufficient Cluster Memory.", task.id());
-                ctx.status(503).result("Error: Insufficient Cluster Memory.");
-            }
-        });
-
-        app.get("/poll-tasks/{workerName}", ctx -> {
-            String workerName = ctx.pathParam("workerName");
-            Queue<DesiredTask> tasks = assignedTasks.get(workerName);
-
-            if (tasks != null && !tasks.isEmpty()) {
-                DesiredTask taskToRun = tasks.poll();
-                ctx.status(200).json(taskToRun);
-            } else {
-                ctx.status(204);
-            }
-        });
+    public void start() {
+        server.start();
+        raft.start();
     }
 
     public static void main(String[] args) {
-        SchedulerStrategy strategy = new BinPack();
-        MasterNode master = new MasterNode(strategy);
-        master.start(7070);
+        
+        List<String> peers1 = List.of("http://localhost:7071", "http://localhost:7072");
+        MasterNode master1 = new MasterNode(7070, "http://localhost:7070", peers1);
+        master1.start();
+
+        List<String> peers2 = List.of("http://localhost:7070", "http://localhost:7072");
+        MasterNode master2 = new MasterNode(7071, "http://localhost:7071", peers2);
+        master2.start();
+
+        List<String> peers3 = List.of("http://localhost:7070", "http://localhost:7071");
+        MasterNode master3 = new MasterNode(7072, "http://localhost:7072", peers3);
+        master3.start();
     }
 }
