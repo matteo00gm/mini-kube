@@ -23,19 +23,5 @@ public class MasterNode {
         server.start();
         raft.start();
     }
-
-    public static void main(String[] args) {
-        
-        List<String> peers1 = List.of("http://localhost:7071", "http://localhost:7072");
-        MasterNode master1 = new MasterNode(7070, "http://localhost:7070", peers1);
-        master1.start();
-
-        List<String> peers2 = List.of("http://localhost:7070", "http://localhost:7072");
-        MasterNode master2 = new MasterNode(7071, "http://localhost:7071", peers2);
-        master2.start();
-
-        List<String> peers3 = List.of("http://localhost:7070", "http://localhost:7071");
-        MasterNode master3 = new MasterNode(7072, "http://localhost:7072", peers3);
-        master3.start();
-    }
+    
 }
