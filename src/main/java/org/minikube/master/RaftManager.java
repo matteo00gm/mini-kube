@@ -1,6 +1,9 @@
 package org.minikube.master;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.minikube.model.Heartbeat.AppendEntriesRequest;
+import org.minikube.model.Heartbeat.AppendEntriesResponse;
 import org.minikube.model.Vote.VoteRequest;
 import org.minikube.model.Vote.VoteResponse;
 import org.slf4j.Logger;
@@ -47,9 +50,6 @@ public class RaftManager {
         startElectionTimer();
     }
 
-    // ====================================================================
-    // INTERNAL RAFT LOOPS
-    // ====================================================================
     private void startElectionTimer() {
         Thread timerThread = new Thread(() -> {
             while (true) {
@@ -129,6 +129,56 @@ public class RaftManager {
     private void becomeLeader() {
         currentState = RaftState.LEADER;
         log.info("Promoted to leader for term {}", currentTerm);
+        startHeartbeatTimer();
+    }
+
+    private void startHeartbeatTimer() {
+        Thread heartbeatThread = new Thread(() -> {
+            while (currentState == RaftState.LEADER) {
+                try {
+                    sendHeartbeats();
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
+        heartbeatThread.setDaemon(true);
+        heartbeatThread.start();
+    }
+
+    private void sendHeartbeats() {
+        try {
+            String jsonPayload = jsonMapper.writeValueAsString(new AppendEntriesRequest(currentTerm, nodeUrl));
+            BodyPublisher body = BodyPublishers.ofString(jsonPayload);
+
+            for (String peerUrl : peerUrls) {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(peerUrl + "/append-entries"))
+                        .header("Content-Type", "application/json")
+                        .POST(body)
+                        .build();
+
+                httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenAccept(response -> {
+                        try {
+                            AppendEntriesResponse res = jsonMapper.readValue(response.body(), AppendEntriesResponse.class);
+                            
+                            if (res.term() > currentTerm) {
+                                synchronized (this) {
+                                    log.warn("Received higher term from a peer. Going back to follower in term {}.", res.term());
+                                    currentTerm = res.term();
+                                    currentState = RaftState.FOLLOWER;
+                                    votedFor = null;
+                                }
+                            }
+                        } catch (Exception e) {}
+                    });
+            }
+        } catch (Exception e) {
+            log.error("Failed to construct heartbeat", e);
+        }
     }
 
     // ====================================================================
@@ -153,5 +203,23 @@ public class RaftManager {
         }
 
         return new VoteResponse(currentTerm, voteGranted);
+    }
+
+    public synchronized AppendEntriesResponse handleAppendEntries(AppendEntriesRequest req) {
+        // If the leader's term is older than ours, reject it
+        if (req.term() < currentTerm) {
+            return new AppendEntriesResponse(currentTerm, false);
+        }
+
+        // If we see a newer term, step down immediately.
+        if (req.term() > currentTerm) {
+            currentTerm = req.term();
+            votedFor = null;
+        }
+
+        currentState = RaftState.FOLLOWER;
+        lastHeartbeatTime.set(System.currentTimeMillis()); 
+        
+        return new AppendEntriesResponse(currentTerm, true);
     }
 }

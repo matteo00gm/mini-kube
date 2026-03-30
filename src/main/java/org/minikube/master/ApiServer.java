@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.javalin.Javalin;
 import org.minikube.model.DesiredTask;
 import org.minikube.model.Node;
+import org.minikube.model.Heartbeat.AppendEntriesRequest;
+import org.minikube.model.Heartbeat.AppendEntriesResponse;
 import org.minikube.model.Vote.VoteRequest;
 import org.minikube.model.Vote.VoteResponse;
 import org.slf4j.Logger;
@@ -69,6 +71,12 @@ public class ApiServer {
         app.post("/request-vote", ctx -> {
             VoteRequest req = jsonMapper.readValue(ctx.body(), VoteRequest.class);
             VoteResponse res = raft.handleVoteRequest(req);
+            ctx.json(res);
+        });
+
+        app.post("/append-entries", ctx -> {
+            AppendEntriesRequest req = jsonMapper.readValue(ctx.body(), AppendEntriesRequest.class);
+            AppendEntriesResponse res = raft.handleAppendEntries(req);
             ctx.json(res);
         });
     }
