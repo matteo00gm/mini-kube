@@ -33,6 +33,8 @@ public class RaftManager {
     private int currentTerm = 0;
     private String votedFor = null;
     private final AtomicLong lastHeartbeatTime = new AtomicLong(System.currentTimeMillis());
+    // volatile guarantees the ApiServer always sees the most recent value
+    private volatile String currentLeader = null;
 
     // Tools
     private final Random random = new Random();
@@ -77,6 +79,7 @@ public class RaftManager {
         currentState = RaftState.CANDIDATE;
         currentTerm++;
         votedFor = nodeUrl;
+        currentLeader = null;
 
         //voting is considered as a heartbeat
         lastHeartbeatTime.set(System.currentTimeMillis());
@@ -130,6 +133,7 @@ public class RaftManager {
         currentState = RaftState.LEADER;
         log.info("Promoted to leader for term {}", currentTerm);
         startHeartbeatTimer();
+        currentLeader = nodeUrl;
     }
 
     private void startHeartbeatTimer() {
@@ -218,8 +222,17 @@ public class RaftManager {
         }
 
         currentState = RaftState.FOLLOWER;
-        lastHeartbeatTime.set(System.currentTimeMillis()); 
+        lastHeartbeatTime.set(System.currentTimeMillis());
+        currentLeader = req.leaderUrl();
         
         return new AppendEntriesResponse(currentTerm, true);
+    }
+
+    public boolean isLeader() {
+        return currentState == RaftState.LEADER;
+    }
+
+    public String getLeaderUrl() {
+        return currentLeader;
     }
 }

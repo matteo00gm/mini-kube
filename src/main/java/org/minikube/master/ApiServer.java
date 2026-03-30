@@ -2,6 +2,14 @@ package org.minikube.master;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.javalin.Javalin;
+import io.javalin.http.Context;
+
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpRequest.BodyPublisher;
+import java.net.http.HttpRequest.BodyPublishers;
+
 import org.minikube.model.DesiredTask;
 import org.minikube.model.Node;
 import org.minikube.model.Heartbeat.AppendEntriesRequest;
@@ -21,6 +29,7 @@ public class ApiServer {
     private final RaftManager raft;
     private final ObjectMapper jsonMapper = new ObjectMapper();
     private Javalin app;
+    private final HttpClient proxyClient = HttpClient.newHttpClient();
 
     public ApiServer(int port, ClusterState state, RaftManager raft) {
         this.port = port;
@@ -36,6 +45,8 @@ public class ApiServer {
         // WORKER & USER ENDPOINTS
         // =======================
         app.post("/register", ctx -> {
+            if (forwardToMaster(ctx)) return;
+            
             Node workerNode = jsonMapper.readValue(ctx.body(), Node.class);
             if (state.isActive(workerNode.getName())) {
                 ctx.status(204).result("Node already exists.");
@@ -46,6 +57,8 @@ public class ApiServer {
         });
 
         app.post("/submit-task", ctx -> {
+            if (forwardToMaster(ctx)) return;
+
             DesiredTask task = jsonMapper.readValue(ctx.body(), DesiredTask.class);
             Node chosenNode = state.scheduleTask(task);
 
@@ -57,6 +70,8 @@ public class ApiServer {
         });
 
         app.get("/poll-tasks/{workerName}", ctx -> {
+            if (forwardToMaster(ctx)) return;
+
             DesiredTask task = state.pollTask(ctx.pathParam("workerName"));
             if (task != null) {
                 ctx.status(200).json(task);
@@ -83,5 +98,41 @@ public class ApiServer {
 
     public void stop() {
         if (app != null) app.stop();
+    }
+
+    private boolean forwardToMaster(Context ctx) {
+        if (raft.isLeader()) {
+            return false; 
+        }
+
+        String leaderUrl = raft.getLeaderUrl();
+        
+        if (leaderUrl == null) {
+            ctx.status(503).result("Cluster is currently electing a new leader. Try again in a few milliseconds.");
+            return true; 
+        }
+
+        log.info("Proxying {} {} to Leader at {}", ctx.method(), ctx.path(), leaderUrl);
+
+        try {
+            BodyPublisher body = ctx.body().isEmpty() 
+                ? BodyPublishers.noBody() 
+                : BodyPublishers.ofString(ctx.body());
+
+            HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(leaderUrl + ctx.path()))
+                    .method(ctx.method().toString(), body)
+                    .header("Content-Type", "application/json")
+                    .build();
+
+            HttpResponse<String> response = proxyClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            ctx.status(response.statusCode()).result(response.body());
+        } catch (Exception e) {
+            log.error("Proxy failed", e);
+            ctx.status(500).result("Failed to forward request to Leader.");
+        }
+        
+        return true;
     }
 }
