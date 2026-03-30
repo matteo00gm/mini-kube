@@ -1,11 +1,9 @@
 package org.minikube.model;
 
-import java.io.Serializable;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class Node implements Serializable {
+public class Node {
 
     private final String name;
     private final int totalMemoryMB;
